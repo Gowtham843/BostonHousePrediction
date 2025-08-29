@@ -1,11 +1,100 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home page</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Boston House Prediction</title>
+  <style>
+    body { font: 14px/1.4 system-ui, sans-serif; margin: 24px; }
+    form { max-width: 780px; display: grid; grid-template-columns: repeat(4, minmax(140px,1fr)); gap: 12px; }
+    label { display: grid; gap: 6px; }
+    input, select, button { padding: 8px; }
+    .full { grid-column: 1 / -1; }
+    #out { margin-top: 16px; font-weight: 600; }
+  </style>
 </head>
 <body>
-    <h1>Home Page</h1>
+  <h1>Boston House Prediction</h1>
+
+  <!-- Keep feature order EXACTLY as the model was trained -->
+  <form id="f" action="{{url_for('predict')}}" method="post">
+    <label>CRIM <input id="CRIM" type="number" step="any" required></label>
+    <label>ZN <input id="ZN" type="number" step="any" required></label>
+    <label>INDUS <input id="INDUS" type="number" step="any" required></label>
+    <label>CHAS
+      <select id="CHAS">
+        <option value="0" selected>0</option>
+        <option value="1">1</option>
+      </select>
+    </label>
+
+    <label>NOX <input id="NOX" type="number" step="any" required></label>
+    <label>RM <input id="RM" type="number" step="any" required></label>
+    <label>AGE <input id="AGE" type="number" step="any" required></label>
+    <label>DIS <input id="DIS" type="number" step="any" required></label>
+
+    <label>RAD <input id="RAD" type="number" step="1" required></label>
+    <label>TAX <input id="TAX" type="number" step="1" required></label>
+    <label>PTRATIO <input id="PTRATIO" type="number" step="any" required></label>
+    <label>B <input id="B" type="number" step="any" required></label>
+
+    <label>LSTAT <input id="LSTAT" type="number" step="any" required></label>
+
+    <div class="full">
+      <button id="prefill" type="button">Prefill sample</button>
+      <button id="submit" type="submit">Predict</button>
+    </div>
+  </form>
+
+  <div id="out">{{prediction_text}}</div>
+
+  <script>
+    const ids = ["CRIM","ZN","INDUS","CHAS","NOX","RM","AGE","DIS","RAD","TAX","PTRATIO","B","LSTAT"];
+
+    function getPayload() {
+      const data = {};
+      for (const k of ids) {
+        const el = document.getElementById(k);
+        const v = el.value;
+        if (v === "") { throw new Error(`Missing value: ${k}`); }
+        // ints for RAD and TAX, everything else float
+        data[k] = (k === "RAD" || k === "TAX") ? parseInt(v, 10) : parseFloat(v);
+      }
+      return { data };
+    }
+
+    document.getElementById("prefill").addEventListener("click", () => {
+      const sample = {
+        CRIM: 0.00632, ZN: 18.0, INDUS: 2.31, CHAS: 0,
+        NOX: 0.538, RM: 6.575, AGE: 65.2, DIS: 4.09,
+        RAD: 1, TAX: 296, PTRATIO: 15.3, B: 396.9, LSTAT: 4.98
+      };
+      for (const k of ids) document.getElementById(k).value = sample[k];
+    });
+
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const out = document.getElementById("out");
+      out.textContent = "Predicting...";
+      try {
+        const payload = getPayload();
+        const res = await fetch("/predict_api", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+        const json = await res.json();
+        // Support either {"prediction": number} or raw number
+        const pred = typeof json === "number" ? json : json.prediction;
+        out.textContent = `Prediction: ${pred}`;
+      } catch (err) {
+        out.textContent = `Error: ${err.message}`;
+      }
+    });
+  </script>
 </body>
 </html>
